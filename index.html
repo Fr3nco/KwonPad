@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteo ESP32 Offline - Sistema Multidispositivo</title>
+    <style>
+        /* --- ESTILOS GENERALES --- */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f1f5f9; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+        }
+        
+        .card { 
+            background: white; 
+            width: 100%; 
+            max-width: 450px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+            border: 1px solid #e2e8f0; 
+            position: relative;
+        }
+        
+        .header { 
+            background-color: #4f46e5; 
+            padding: 24px; 
+            text-align: center; 
+            color: white; 
+            position: relative;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+        .header h1 { margin: 0; font-size: 24px; position: relative; z-index: 10;}
+        .header p { margin: 5px 0 0; opacity: 0.8; font-size: 14px; position: relative; z-index: 10;}
+
+        /* --- BARRA LED SIMULADA --- */
+        .led-strip { height: 10px; width: 100%; background-color: #333; transition: background-color 0.1s, box-shadow 0.1s; }
+        .led-on-yellow { background-color: #facc15; box-shadow: 0 0 15px #facc15; }
+        .led-on-green { background-color: #22c55e; box-shadow: 0 0 15px #22c55e; }
+        .led-on-red { background-color: #ef4444; box-shadow: 0 0 20px #ef4444; }
+
+        .content { padding: 24px; }
+        .pantalla { transition: opacity 0.3s ease; }
+        .oculto { display: none !important; }
+
+        /* --- BOTONES DEL MENÚ --- */
+        .btn-menu { width: 100%; margin-bottom: 12px; padding: 15px 20px; border-radius: 12px; border: 2px solid transparent; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; }
+        .btn-normal { background-color: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+        .btn-normal:hover { background-color: #dbeafe; transform: translateY(-2px); }
+        .btn-semaforo { background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+        .btn-semaforo:hover { background-color: #dcfce7; transform: translateY(-2px); }
+        .btn-velocidad { background-color: #fdf4ff; color: #a21caf; border-color: #f5d0fe; }
+        .btn-velocidad:hover { background-color: #fae8ff; transform: translateY(-2px); }
+        
+        .btn-contra-reloj { background-color: #fffbeb; color: #b45309; border-color: #fde68a; }
+        .btn-contra-reloj:hover { background-color: #fef08a; transform: translateY(-2px); }
+        
+        .btn-icono { font-size: 24px; }
+        
+        /* --- ELEMENTOS DE JUEGO CLÁSICO --- */
+        .display-box { text-align: center; margin-bottom: 10px; padding: 10px; border-radius: 12px; transition: all 0.2s; }
+        .label { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .numero-grande { font-size: 60px; font-weight: 900; color: #4f46e5; margin: 5px 0; min-height: 70px; display: flex; justify-content: center; align-items: center; }
+        .semaforo-rojo { background-color: #fee2e2; border: 2px solid #ef4444; }
+        .semaforo-rojo .numero-grande { color: #dc2626; font-size: 40px; } 
+        .semaforo-verde { background-color: #dcfce7; border: 2px solid #22c55e; transform: scale(1.05); }
+        .semaforo-verde .numero-grande { color: #15803d; font-size: 50px; }
+
+        /* --- MODO COMPETICIÓN --- */
+        .grid-competidores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+        .tarjeta-competidor { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center; transition: all 0.2s; position: relative; }
+        .tarjeta-competidor.conectado { border-color: #3b82f6; }
+        .tarjeta-competidor.golpeando { transform: scale(1.05); border-color: #f59e0b; background: #fef3c7; box-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }
+        .competidor-nombre { font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 5px; word-break: break-all; }
+        .competidor-golpes { font-size: 36px; font-weight: 900; color: #1e293b; margin: 5px 0; line-height: 1; }
+        
+        .btn-iniciar-comp { width: 100%; padding: 15px; font-size: 18px; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; transition: all 0.2s; margin-bottom: 15px; }
+        .btn-iniciar-comp.ready { background: #22c55e; color: white; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4); }
+        .btn-iniciar-comp.countdown { background: #f59e0b; color: white; }
+        .btn-iniciar-comp.running { background: #ef4444; color: white; }
+        .btn-iniciar-comp:disabled { background: #cbd5e1; color: #64748b; cursor: not-allowed; box-shadow: none; }
+
+        .podium { display: flex; gap: 10px; justify-content: center; align-items: flex-end; margin-top: 15px; min-height: 150px; }
+        .puesto { text-align: center; border-radius: 8px; padding: 10px; transition: all 0.3s; width: 30%; }
+        
+        .puesto-1 { 
+            background: linear-gradient(135deg, #fbbf24, #f59e0b); 
+            color: #451a03; 
+            min-height: 130px; 
+            transform: scale(1.1); 
+            z-index: 2; 
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .puesto-1:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+        .puesto-2 { background: linear-gradient(135deg, #94a3b8, #64748b); color: white; min-height: 100px; }
+        .puesto-3 { background: linear-gradient(135deg, #b45309, #92400e); color: #fef3c7; min-height: 80px; }
+        .puesto-numero { font-size: 24px; font-weight: 900; }
+        .puesto-nombre { font-size: 11px; font-weight: bold; margin: 5px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+        .puesto-golpes { font-size: 20px; font-weight: 900; }
+
+        .cuenta-regresiva { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-size: 100px; font-weight: 900; color: #f8fafc; }
+        .cuenta-label { font-size: 20px; color: #94a3b8; margin-bottom: 10px; }
+
+        /* --- PANTALLA GANADOR COMPLETA --- */
+        .overlay-ganador {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #451a03;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1100;
+            cursor: pointer;
+            animation: expandirPantalla 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        .ganador-corona {
+            font-size: 80px;
+            margin-bottom: 15px;
+            animation: rebotarCorona 1s infinite alternate ease-in-out;
+        }
+
+        .ganador-titulo {
+            font-size: 18px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .ganador-nombre-grande {
+            font-size: 42px;
+            font-weight: 900;
+            text-align: center;
+            word-break: break-all;
+            padding: 0 30px;
+            margin: 10px 0 25px;
+            text-shadow: 0 2px 4px rgba(69, 26, 3, 0.15);
+        }
+
+        .ganador-golpes-grande {
+            font-size: 64px;
+            font-weight: 900;
+            line-height: 1;
+            margin: 0;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 25px;
+            border-radius: 99px;
+            border: 2px solid rgba(69, 26, 3, 0.15);
+        }
+
+        .ganador-tap-cerrar {
+            font-size: 13px;
+            font-weight: bold;
+            opacity: 0.6;
+            margin-top: 50px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @keyframes expandirPantalla {
+            from { transform: scale(0.6); opacity: 0; border-radius: 50%; }
+            to { transform: scale(1); opacity: 1; border-radius: 0; }
+        }
+
+        @keyframes rebotarCorona {
+            from { transform: translateY(0) scale(1); }
+            to { transform: translateY(-15px) scale(1.05); }
+        }
+
+        /* --- BOTÓN DESLIZABLE INTERACTIVO (SWITCH TOGGLE) --- */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4f46e5;
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* --- OTROS CONTROLES --- */
+        .selector-tiempo { display: flex; gap: 5px; margin-bottom: 15px; background: #f1f5f9; padding: 5px; border-radius: 10px; }
+        .btn-tiempo { flex: 1; padding: 8px 0; border: none; background: transparent; color: #64748b; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .btn-tiempo.activo { background: #4f46e5; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .combo-container { margin-bottom: 15px; text-align: center; }
+        .barra-fondo { height: 12px; background-color: #e2e8f0; border-radius: 6px; overflow: hidden; width: 80%; margin: 0 auto; }
+        .barra-progreso { height: 100%; width: 0%; background: #4f46e5; border-radius: 6px; transform-origin: left; }
+        .combo-badge { display: inline-block; background: #cbd5e1; color: #475569; font-weight: bold; font-size: 14px; padding: 4px 12px; border-radius: 20px; margin-bottom: 5px; }
+        .combo-activo { background: #fef3c7; color: #d97706; transform: scale(1.1); box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+
+        .stats-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .stat-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center; }
+        .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #334155; }
+        .stat-oro { color: #d97706; } 
+        .stat-azul { color: #2563eb; } 
+        
+        .botones { display: flex; gap: 10px; margin-bottom: 20px; justify-content: flex-end;}
+        button { border: none; cursor: pointer; border-radius: 12px; transition: transform 0.1s; font-size: 16px; touch-action: manipulation; }
+        button:active { transform: scale(0.95); }
+        .btn-generar { flex: 1; background-color: #4f46e5; color: white; font-weight: bold; padding: 20px; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4); font-size: 18px; }
+        .btn-borrar { background-color: #f1f5f9; color: #475569; padding: 15px 20px; font-weight: bold; }
+        .btn-volver { background-color: transparent; color: #64748b; font-size: 12px; padding: 5px 10px; margin-bottom: 10px; text-decoration: underline; }
+
+        .focos-conectados-badge { font-size: 11px; font-weight: bold; color: #475569; background: #cbd5e1; padding: 3px 10px; border-radius: 20px; display: inline-block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY CUENTA REGRESIVA COMPETITIVO -->
+    <div id="cuenta-regresiva" class="cuenta-regresiva oculto">
+        <div class="cuenta-label">PREPÁRATE</div>
+        <div id="cuenta-numero">3</div>
+    </div>
+
+    <!-- PANTALLA GANADOR COMPLETA -->
+    <div id="overlay-ganador" class="overlay-ganador oculto" onclick="cerrarOverlayGanador()">
+        <div class="ganador-corona" id="ganador-corona">👑</div>
+        <div class="ganador-titulo" id="ganador-titulo">Ganador Absoluto</div>
+        <div id="ganador-nombre-pantalla" class="ganador-nombre-grande">--</div>
+        <div id="ganador-golpes-pantalla" class="ganador-golpes-grande">0</div>
+        <div class="ganador-tap-cerrar">Toca en cualquier lado para volver</div>
+    </div>
+
+    <div class="card">
+        <div id="simulador-led" class="led-strip"></div>
+        
+        <div class="header" id="header-principal">
+            <h1 id="titulo-header">🎮 Selecciona Nivel</h1>
+            <p id="subtitulo-header">Elige tu desafío</p>
+        </div>
+
+        <div class="content">
+            
+            <!-- PANTALLA MENÚ -->
+            <div id="pantalla-menu" class="pantalla">
+                <button id="btn-conectar" onclick="conectarBLE()" style="width: 100%; padding: 15px; margin-bottom: 5px; background-color: #0ea5e9; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
+                     ➕ Vincular Foco Bluetooth
+                </button>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <span id="focos-contador" class="focos-conectados-badge">Focos vinculados: 0</span>
+                </div>
+
+                <button onclick="iniciarJuego('semaforo')" class="btn-menu btn-semaforo">
+                    <div style="text-align: left;">
+                        <div>Modo Semáforo</div>
+                        <div style="font-size: 12px; opacity: 0.8; font-weight: normal;">Velocidad De Reacción</div>
+                    </div>
+                    <span class="btn-icono">🚦</span>
+                </button>
+
+                <button onclick="iniciarJuego('competitivo')" class="btn-menu btn-velocidad">
+                    <div style="text-align: left;">
+                        <div>Modo Competición</div>
+                        <div style="font-size: 12px; opacity: 0.8; font-weight: normal;">Desafío por Tiempo</div>
+                    </div>
+                    <span class="btn-icono">🏆</span>
+                </button>
+
+                <button onclick="iniciarJuego('contra-reloj')" class="btn-menu btn-contra-reloj">
+                    <div style="text-align: left;">
+                        <div>Modo ContraReloj</div>
+                        <div style="font-size: 12px; opacity: 0.8; font-weight: normal;">Ritmo Constante</div>
+                    </div>
+                    <span class="btn-icono">⚡</span>
+                </button>
+            </div>
+            
+            <!-- PANTALLA JUEGO -->
+            <div id="pantalla-juego" class="pantalla oculto">
+                
+                <div style="text-align: right;">
+                    <button onclick="volverAlMenu()" class="btn-volver">← Cambiar Nivel</button>
+                </div>
+
+                <div id="selector-velocidad" class="selector-tiempo oculto">
+                    <button class="btn-tiempo activo" onclick="seleccionarTiempo(10, this)">10s</button>
+                    <button class="btn-tiempo" onclick="seleccionarTiempo(15, this)">15s</button>
+                    <button class="btn-tiempo" onclick="seleccionarTiempo(30, this)">30s</button>
+                    <button class="btn-tiempo" onclick="seleccionarTiempo(60, this)">60s</button>
+                </div>
+
+                <!-- SECCIÓN MODO COMPETITIVO -->
+                <div id="seccion-competitivo" class="oculto">
+                    <div id="grid-competidores" class="grid-competidores">
+                        <!-- Se llena dinámicamente con los focos conectados -->
+                    </div>
+                    <button id="btn-iniciar-comp" class="btn-iniciar-comp ready" onclick="iniciarCompetencia()">
+                        🏁 INICIAR COMPETENCIA
+                    </button>
+                    <div id="resultados-competitivo" class="oculto">
+                        <div class="label" style="text-align:center; margin-top:10px;">Resultados Finales</div>
+                        <div style="font-size: 10px; color: #64748b; text-align: center; margin-bottom: 5px;">🏆 Toca la copa para celebrar al ganador 🏆</div>
+                        <div id="podium" class="podium"></div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN MODOS CLÁSICOS -->
+                <div id="seccion-clasica">
+                    <!-- Selector deslizable exclusivo para el Modo Semáforo -->
+                    <div id="control-modo-semaforo" class="oculto" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                        <span style="font-size: 13px; font-weight: bold; color: #64748b; text-transform: uppercase;">Normal</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-semaforo-modo">
+                            <span class="slider"></span>
+                        </label>
+                        <span style="font-size: 13px; font-weight: bold; color: #64748b; text-transform: uppercase;">Infinito</span>
+                    </div>
+
+                    <div id="caja-visual" class="display-box">
+                        <div class="label" id="etiqueta-principal">Último Número</div>
+                        <div id="display-principal" class="numero-grande">--</div>
+                    </div>
+
+                    <!-- Grid para Semáforo de Pantallas Divididas por Foco -->
+                    <div id="grid-semaforo" class="oculto" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                        <!-- Se llena dinámicamente con las tarjetas de los focos conectados -->
+                    </div>
+
+                    <div id="seccion-combo" class="combo-container">
+                        <span id="combo-texto" class="combo-badge">Combo x0</span>
+                        <div id="nivel-info" style="font-size: 12px; margin-top: 5px; margin-bottom: 5px; color: #64748b;"></div>
+                        <div class="barra-fondo">
+                            <div id="barra-combo" class="barra-progreso"></div>
+                        </div>
+                    </div>
+
+                    <div id="panel-estadisticas" class="stats-container oculto">
+                        <div class="stat-card">
+                            <div class="stat-label">🏆 Golpe de Oro</div>
+                            <div id="stat-max" class="stat-value stat-oro">--</div>
+                        </div>
+                        <div id="stat-card-avg" class="stat-card">
+                            <div class="stat-label">📈 Resistencia (Prom)</div>
+                            <div id="stat-avg" class="stat-value stat-azul">--</div>
+                        </div>
+                    </div>
+
+                    <div class="botones" id="botones-clasicos">
+                        <button id="btn-accion" onmousedown="accionJuego(null, 'manual', 'Prueba Manual')" ontouchstart="accionJuego(null, 'manual', 'Prueba Manual')" class="btn-generar">⚡ TAP</button>
+                        <button onclick="limpiarLista()" class="btn-borrar">🗑️</button>
+                    </div>
+                </div>
+
+            </div> 
+
+        </div> 
+    </div> 
+
+    <script>
+        // --- 1. VARIABLES GLOBALES ---
+        let totalRegistros = 0;
+        let ultimaVezClick = null;
+        const MINIMO = 100;
+        const MAXIMO = 3000; 
+
+        let modoJuego = ''; 
+        let tiempoJuegoActual = 600;
+        let ultimoDisparo = 0;
+        
+        let comboActual = 0;
+        let temporizadorCombo = null; 
+        let estadoSemaforo = 'esperando_inicio';
+        let tiempoInicioVerde = 0;
+        let timeoutSemaforo = null;
+
+        // GLOBALES PARA EL SEMÁFORO MULTIDISPOSITIVO (PANTALLAS DIVIDIDAS)
+        let resultadosSemaforoRonda = {};
+        let timeoutSemaforoAutoReinicio = null;
+
+        // Variables Competitivo / Competición
+        let tiempoSeleccionado = 10;
+        let estadoCompetencia = 'esperando'; 
+        let timerCompetencia = null;
+
+        // Variables ContraReloj
+        let golpesContraReloj = 0;
+        let recordContraReloj = 0;
+        let timerContraReloj = null;
+        let estadoContraReloj = 'esperando'; 
+
+        let maxFuerza = 0;
+        let sumaFuerza = 0;
+        let contadorFuerza = 0;
+
+        // Lista de Focos BLE 
+        let listaFocosConectados = []; 
+        
+        // CONTADOR SESIÓN BLE PARA ASIGNACIÓN DE ALIAS
+        let totalFocosConectadosHistorico = 0;
+
+        // --- SISTEMA DE NOTIFICACIÓN TOAST (REEMPLAZA ALERT) ---
+        function mostrarNotificacion(mensaje) {
+            const toast = document.createElement('div');
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.backgroundColor = '#ef4444';
+            toast.style.color = 'white';
+            toast.style.padding = '12px 24px';
+            toast.style.borderRadius = '12px';
+            toast.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
+            toast.style.zIndex = '9999';
+            toast.style.fontWeight = 'bold';
+            toast.style.fontSize = '14px';
+            toast.style.transition = 'opacity 0.3s ease';
+            toast.innerText = mensaje;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- SINTETIZADOR DE PITIDO DE FALTA (CONTRARELOJ / SEMÁFORO) ---
+        function reproducirPitidoFalta() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            
+            const ctx = new AudioContext();
+            const t = ctx.currentTime;
+            
+            const oscilador = ctx.createOscillator();
+            const ganancia = ctx.createGain();
+            
+            oscilador.type = 'sawtooth'; 
+            oscilador.frequency.setValueAtTime(140, t); 
+            
+            ganancia.gain.setValueAtTime(0.5, t);
+            ganancia.gain.exponentialRampToValueAtTime(0.01, t + 0.4); 
+            
+            oscilador.connect(ganancia);
+            ganancia.connect(ctx.destination);
+            
+            oscilador.start(t);
+            oscilador.stop(t + 0.4);
+        }
+
+        // --- 2. FUNCIONES BASE ---
+        function feedbackLuminico(fuerza) {
+            const led = document.getElementById('simulador-led');
+            if (fuerza < 500) led.className = "led-strip led-on-yellow";
+            else if (fuerza >= 500 && fuerza <= 2000) led.className = "led-strip led-on-green";
+            else led.className = "led-strip led-on-red";
+            setTimeout(() => { led.className = "led-strip"; }, 300);
+        }
+
+        function procesarEstadisticas(fuerza) {
+            if (fuerza > maxFuerza) {
+                maxFuerza = fuerza;
+                document.getElementById('stat-max').innerText = maxFuerza;
+            }
+            sumaFuerza += fuerza;
+            contadorFuerza++;
+            document.getElementById('stat-avg').innerText = (sumaFuerza / contadorFuerza).toFixed(1);
+        }
+
+        function reiniciarEstadisticas() {
+            maxFuerza = 0; sumaFuerza = 0; contadorFuerza = 0;
+            document.getElementById('stat-max').innerText = "--";
+            document.getElementById('stat-avg').innerText = "--";
+        }
+
+        function iniciarJuego(modo) {
+            modoJuego = modo;
+            const titulo = document.getElementById('titulo-header');
+            const subtitulo = document.getElementById('subtitulo-header');
+            
+            const seccionClasica = document.getElementById('seccion-clasica');
+            const seccionCombo = document.getElementById('seccion-combo');
+            const panelStats = document.getElementById('panel-estadisticas'); 
+            const statAvg = document.getElementById('stat-card-avg');
+            const selectorVelocidad = document.getElementById('selector-velocidad');
+            const btnAccion = document.getElementById('btn-accion');
+            const seccionCompetitivo = document.getElementById('seccion-competitivo');
+
+            limpiarLista();
+
+            // Reset vistas
+            seccionClasica.classList.remove('oculto');
+            seccionCompetitivo.classList.add('oculto');
+            seccionCombo.classList.add('oculto');
+            panelStats.classList.add('oculto');
+            selectorVelocidad.classList.add('oculto');
+            statAvg.classList.remove('oculto');
+            btnAccion.style.backgroundColor = "#4f46e5";
+            btnAccion.classList.remove('oculto');
+            
+            document.querySelector('#panel-estadisticas .stat-card:first-child .stat-label').innerText = "🏆 Golpe de Oro";
+
+            if (modo === 'semaforo') {
+                titulo.innerText = "🚦 Semáforo";
+                subtitulo.innerText = "Velocidad De Reacción";
+                btnAccion.innerText = "INICIAR";
+                document.getElementById('display-principal').innerText = "TOCA";
+                document.getElementById('etiqueta-principal').innerText = "Estado";
+                estadoSemaforo = 'esperando_inicio';
+                
+                // Mostrar control deslizante (Normal/Infinito)
+                document.getElementById('control-modo-semaforo').classList.remove('oculto');
+                
+                // Inicializar pantallas divididas si hay dispositivos conectados
+                actualizarGridSemaforo();
+            
+            } else if (modo === 'competitivo') {
+                titulo.innerText = "🏆 Modo Competición";
+                subtitulo.innerText = "Desafío por Tiempo";
+                
+                seccionClasica.classList.add('oculto');
+                seccionCompetitivo.classList.remove('oculto');
+                selectorVelocidad.classList.remove('oculto');
+                document.getElementById('control-modo-semaforo').classList.add('oculto');
+                document.getElementById('grid-semaforo').classList.add('oculto');
+                
+                estadoCompetencia = 'esperando';
+                actualizarGridCompetidores(); 
+
+            } else if (modo === 'contra-reloj') {
+                titulo.innerText = "⚡ ContraReloj";
+                subtitulo.innerText = "Ritmo Constante";
+                seccionCombo.classList.remove('oculto'); 
+                panelStats.classList.remove('oculto'); 
+                document.getElementById('control-modo-semaforo').classList.add('oculto');
+                document.getElementById('grid-semaforo').classList.add('oculto');
+                
+                statAvg.classList.add('oculto'); 
+                document.querySelector('#panel-estadisticas .stat-card:first-child .stat-label').innerText = "🏆 Récord";
+                document.getElementById('stat-max').innerText = recordContraReloj > 0 ? recordContraReloj : "--";
+                
+                estadoContraReloj = 'esperando';
+                golpesContraReloj = 0;
+                
+                document.getElementById('display-principal').innerText = "0";
+                document.getElementById('etiqueta-principal').innerText = "Golpea para iniciar";
+                btnAccion.innerText = "⚡ GOLPEAR";
+                btnAccion.style.backgroundColor = "#d97706";
+            }
+
+            document.getElementById('pantalla-menu').classList.add('oculto');
+            document.getElementById('pantalla-juego').classList.remove('oculto');
+        }
+
+        function volverAlMenu() {
+            limpiarTimers();
+            resetVisualSemaforo();
+            document.getElementById('control-modo-semaforo').classList.add('oculto');
+            document.getElementById('grid-semaforo').classList.add('oculto');
+            document.getElementById('caja-visual').classList.remove('oculto');
+            document.getElementById('titulo-header').innerText = "🎮 Selecciona Nivel";
+            document.getElementById('subtitulo-header').innerText = "Elige tu desafío";
+            document.getElementById('pantalla-juego').classList.add('oculto');
+            document.getElementById('pantalla-menu').classList.remove('oculto');
+        }
+
+        function accionJuego(fuerzaReal = null, idOrigen = "manual", nombreOrigen = "Manual") {
+            const ahoraMismo = Date.now();
+            if (fuerzaReal === null) {
+                if (ahoraMismo - ultimoDisparo < 100) return; 
+                ultimoDisparo = ahoraMismo;
+            }
+
+            const fuerzaFinal = fuerzaReal !== null ? fuerzaReal : (Math.floor(Math.random() * (MAXIMO - MINIMO + 1)) + MINIMO);
+
+            if (modoJuego === 'semaforo') logicaSemaforo(fuerzaFinal, idOrigen, nombreOrigen);
+            else if (modoJuego === 'competitivo') logicaCompetitivo(fuerzaFinal, idOrigen, nombreOrigen);
+            else if (modoJuego === 'contra-reloj') logicaContraReloj(fuerzaFinal, nombreOrigen);
+        }
+
+        // --- LÓGICA MODO CONTRARELOJ ---
+        function logicaContraReloj(fuerza, nombreOrigen) {
+            const display = document.getElementById('display-principal');
+            const etiqueta = document.getElementById('etiqueta-principal');
+
+            if (estadoContraReloj === 'esperando') {
+                estadoContraReloj = 'jugando';
+                golpesContraReloj = 1;
+                display.innerText = golpesContraReloj;
+                etiqueta.innerText = `¡Ritmo activo por ${nombreOrigen}!`;
+                
+                feedbackLuminico(fuerza);
+                iniciarTemporizadorContraReloj();
+
+            } else if (estadoContraReloj === 'jugando') {
+                golpesContraReloj++;
+                display.innerText = golpesContraReloj;
+                etiqueta.innerText = `¡Sigue así! Golpe por ${nombreOrigen}`;
+                
+                feedbackLuminico(fuerza);
+                iniciarTemporizadorContraReloj();
+            }
+        }
+
+        function iniciarTemporizadorContraReloj() {
+            const barra = document.getElementById('barra-combo');
+            const textCombo = document.getElementById('combo-texto');
+
+            if (timerContraReloj) {
+                clearTimeout(timerContraReloj);
+            }
+
+            textCombo.innerText = "🔥 MANTÉN EL RITMO";
+            textCombo.classList.add('combo-activo');
+
+            barra.style.transition = 'none';
+            barra.style.width = '100%';
+            barra.style.background = "#f59e0b"; 
+            void barra.offsetWidth; 
+
+            barra.style.transition = 'width 1000ms linear';
+            barra.style.width = '0%';
+
+            timerContraReloj = setTimeout(() => {
+                reproducirPitidoFalta();
+
+                if (golpesContraReloj > recordContraReloj) {
+                    recordContraReloj = golpesContraReloj;
+                    document.getElementById('stat-max').innerText = recordContraReloj;
+                }
+
+                document.getElementById('display-principal').innerText = "FALTA";
+                document.getElementById('etiqueta-principal').innerText = `Tiempo agotado (Total: ${golpesContraReloj})`;
+                textCombo.innerText = "❌ TIEMPO AGOTADO";
+                textCombo.classList.remove('combo-activo');
+
+                golpesContraReloj = 0;
+                estadoContraReloj = 'esperando';
+
+            }, 1000);
+        }
+
+        // --- LÓGICA COMPETITIVA SEGURA CON IDs ---
+        function actualizarGridCompetidores() {
+            const grid = document.getElementById('grid-competidores');
+            grid.innerHTML = '';
+            const btn = document.getElementById('btn-iniciar-comp');
+
+            if (listaFocosConectados.length === 0) {
+                grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding: 20px; color:#64748b;">No hay focos vinculados. Ve al menú y vincula al menos uno para jugar este modo.</div>';
+                btn.disabled = true;
+                btn.innerText = "🔒 CONECTA FOCOS PRIMERO";
+                return;
+            }
+
+            listaFocosConectados.forEach(foco => {
+                const idLimpio = foco.id.replace(/[^a-zA-Z0-9]/g, '-');
+                
+                const div = document.createElement('div');
+                div.className = 'tarjeta-competidor conectado';
+                div.id = 'tarjeta-' + idLimpio;
+                div.innerHTML = `
+                    <div class="competidor-nombre">${foco.name}</div>
+                    <div class="competidor-golpes" id="golpes-${idLimpio}">${foco.golpes || 0}</div>
+                `;
+                grid.appendChild(div);
+            });
+
+            btn.disabled = false;
+            if(estadoCompetencia === 'esperando' || estadoCompetencia === 'terminado') {
+                btn.innerText = '🏁 INICIAR COMPETENCIA';
+                btn.className = 'btn-iniciar-comp ready';
+            }
+        }
+
+        function seleccionarTiempo(segundos, botonElement) {
+            if (estadoCompetencia === 'jugando' || estadoCompetencia === 'cuenta_regresiva') return;
+            tiempoSeleccionado = segundos;
+            document.querySelectorAll('.btn-tiempo').forEach(btn => btn.classList.remove('activo'));
+            botonElement.classList.add('activo');
+        }
+
+        function iniciarCompetencia() {
+            if(listaFocosConectados.length === 0) return;
+            
+            estadoCompetencia = 'cuenta_regresiva';
+            document.getElementById('resultados-competitivo').classList.add('oculto');
+            limpiarLista();
+
+            listaFocosConectados.forEach(f => f.golpes = 0);
+            actualizarGridCompetidores();
+
+            const overlay = document.getElementById('cuenta-regresiva');
+            const numero = document.getElementById('cuenta-numero');
+            const btn = document.getElementById('btn-iniciar-comp');
+            
+            btn.className = 'btn-iniciar-comp countdown';
+            btn.innerText = "ESPERA...";
+            overlay.classList.remove('oculto');
+
+            let cuenta = 3; 
+            numero.innerText = cuenta;
+            numero.style.color = '#f8fafc';
+
+            const intervaloCuenta = setInterval(() => {
+                cuenta--;
+                if (cuenta > 0) {
+                    numero.innerText = cuenta;
+                    if(cuenta === 1) numero.style.color = '#ef4444';
+                } else if (cuenta === 0) {
+                    numero.innerText = "¡YA!";
+                    numero.style.color = '#22c55e';
+                } else {
+                    clearInterval(intervaloCuenta);
+                    overlay.classList.add('oculto');
+                    
+                    estadoCompetencia = 'jugando';
+                    let tiempoRestante = tiempoSeleccionado;
+                    
+                    btn.className = 'btn-iniciar-comp running';
+                    btn.innerText = `⏱️ ${tiempoRestante}s RESTANTES`;
+
+                    timerCompetencia = setInterval(() => {
+                        tiempoRestante--;
+                        if (tiempoRestante > 0) {
+                            btn.innerText = `⏱️ ${tiempoRestante}s RESTANTES`;
+                        } else {
+                            clearInterval(timerCompetencia);
+                            finalizarCompetencia();
+                        }
+                    }, 1000);
+                }
+            }, 1000);
+        }
+
+        function logicaCompetitivo(fuerza, idOrigen, nombreOrigen) {
+            if (estadoCompetencia !== 'jugando') return;
+
+            let foco = listaFocosConectados.find(f => f.id === idOrigen);
+            if (foco) {
+                foco.golpes = (foco.golpes || 0) + 1;
+                
+                const idLimpio = foco.id.replace(/[^a-zA-Z0-9]/g, '-');
+                document.getElementById('golpes-' + idLimpio).innerText = foco.golpes;
+                
+                const tarjeta = document.getElementById('tarjeta-' + idLimpio);
+                tarjeta.classList.add('golpeando');
+                setTimeout(() => tarjeta.classList.remove('golpeando'), 200);
+
+                feedbackLuminico(fuerza);
+            }
+        }
+
+        function finalizarCompetencia() {
+            estadoCompetencia = 'terminado';
+            const btn = document.getElementById('btn-iniciar-comp');
+            btn.className = 'btn-iniciar-comp ready';
+            btn.innerText = '🔄 REPETIR COMPETENCIA';
+
+            const panelResultados = document.getElementById('resultados-competitivo');
+            const podium = document.getElementById('podium');
+            
+            const resultados = [...listaFocosConectados].sort((a, b) => (b.golpes || 0) - (a.golpes || 0));
+            
+            const maxGolpes = resultados.length > 0 ? (resultados[0].golpes || 0) : 0;
+            const ganadores = resultados.filter(f => (f.golpes || 0) === maxGolpes);
+            const esEmpate = ganadores.length > 1;
+            
+            podium.innerHTML = '';
+            resultados.slice(0, 3).forEach((foco, index) => {
+                const puesto = index + 1;
+                const div = document.createElement('div');
+                
+                if (esEmpate && (foco.golpes || 0) === maxGolpes) {
+                    div.className = `puesto puesto-1`;
+                    div.title = "¡Empate! Haz clic para celebrar";
+                    div.onclick = () => mostrarGanadorFullScreen(ganadores.map(g => g.name).join(" y "), maxGolpes, true);
+                } else {
+                    div.className = `puesto puesto-${puesto}`;
+                    if (puesto === 1) {
+                        div.title = "¡Haz clic para celebrar!";
+                        div.onclick = () => mostrarGanadorFullScreen(foco.name, foco.golpes || 0, false);
+                    }
+                }
+                
+                let puestoNumeroTexto = `#${puesto}`;
+                if (esEmpate && (foco.golpes || 0) === maxGolpes) {
+                    puestoNumeroTexto = "🤝 Empate";
+                }
+                
+                div.innerHTML = `
+                    <div class="puesto-numero">${puestoNumeroTexto}</div>
+                    <div class="puesto-nombre">${foco.name}</div>
+                    <div class="puesto-golpes">${foco.golpes || 0}</div>
+                `;
+                podium.appendChild(div);
+            });
+
+            panelResultados.classList.remove('oculto');
+
+            if (resultados.length > 0) {
+                if (esEmpate) {
+                    mostrarGanadorFullScreen(ganadores.map(g => g.name).join(" y "), maxGolpes, true);
+                } else {
+                    mostrarGanadorFullScreen(ganadores[0].name, maxGolpes, false);
+                }
+            }
+        }
+
+        function mostrarGanadorFullScreen(nombre, golpes, esEmpate = false) {
+            const titulo = document.getElementById('ganador-titulo');
+            const corona = document.getElementById('ganador-corona');
+            
+            if (esEmpate) {
+                titulo.innerText = "¡Empate!";
+                corona.innerText = "🤝";
+            } else {
+                titulo.innerText = "Ganador Absoluto";
+                corona.innerText = "👑";
+            }
+            
+            document.getElementById('ganador-nombre-pantalla').innerText = nombre;
+            document.getElementById('ganador-golpes-pantalla').innerText = `${golpes} golpes`;
+            document.getElementById('overlay-ganador').classList.remove('oculto');
+        }
+
+        function cerrarOverlayGanador() {
+            document.getElementById('overlay-ganador').classList.add('oculto');
+        }
+
+        // --- PANTALLAS DIVIDIDAS: GESTIÓN DE TARJETAS EN MODO SEMÁFORO ---
+        function actualizarGridSemaforo() {
+            const grid = document.getElementById('grid-semaforo');
+            grid.innerHTML = '';
+            
+            if (listaFocosConectados.length === 0) {
+                grid.classList.add('oculto');
+                document.getElementById('caja-visual').classList.remove('oculto');
+                return;
+            }
+            
+            grid.classList.remove('oculto');
+            document.getElementById('caja-visual').classList.add('oculto');
+
+            listaFocosConectados.forEach(foco => {
+                const idF = foco.id.replace(/[^a-zA-Z0-9]/g, '-');
+                const card = document.createElement('div');
+                card.id = `semaforo-card-${idF}`;
+                card.className = "display-box border-2 border-slate-200 transition-all duration-200 p-4 rounded-xl text-center bg-white shadow-sm";
+                card.innerHTML = `
+                    <div class="label text-slate-500 font-bold uppercase text-xs tracking-wider" style="font-size:10px;">${foco.name}</div>
+                    <div class="numero-grande text-3xl font-extrabold my-2 flex items-center justify-center text-slate-400" id="semaforo-display-${idF}" style="font-size: 32px; min-height: 48px;">--</div>
+                    <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider" id="semaforo-status-${idF}">Listo</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function marcarGanadorOroSemaforo() {
+            const validos = Object.entries(resultadosSemaforoRonda)
+                .filter(([id, data]) => !data.falta && data.reaccion !== null);
+
+            if (validos.length === 0) return;
+
+            let minReaccion = Infinity;
+            let ganadorId = null;
+
+            validos.forEach(([id, data]) => {
+                if (data.reaccion < minReaccion) {
+                    minReaccion = data.reaccion;
+                    ganadorId = id;
+                }
+            });
+
+            listaFocosConectados.forEach(f => {
+                const idF = f.id.replace(/[^a-zA-Z0-9]/g, '-');
+                const fCard = document.getElementById(`semaforo-card-${idF}`);
+                const fStatus = document.getElementById(`semaforo-status-${idF}`);
+                
+                if (fCard && fStatus) {
+                    if (f.id === ganadorId) {
+                        fCard.className = "display-box border-4 border-amber-400 bg-amber-50 transition-all duration-200 p-4 rounded-xl text-center shadow-lg transform scale-105 ring-4 ring-amber-400 ring-opacity-25";
+                        fStatus.innerText = "👑 ¡MÁS RÁPIDO!";
+                        fStatus.className = "text-[10px] text-amber-600 font-extrabold uppercase tracking-wider animate-bounce";
+                    } else {
+                        const dataF = resultadosSemaforoRonda[f.id];
+                        if (dataF && !dataF.falta) {
+                            fCard.className = "display-box border-2 border-slate-300 bg-white transition-all duration-200 p-4 rounded-xl text-center shadow-sm";
+                            fStatus.innerText = "Completado";
+                            fStatus.className = "text-[10px] text-slate-400 font-semibold uppercase tracking-wider";
+                        }
+                    }
+                }
+            });
+        }
+
+        function reiniciarSemaforoInfinitoAutomatico() {
+            if (timeoutSemaforoAutoReinicio) {
+                clearTimeout(timeoutSemaforoAutoReinicio);
+                timeoutSemaforoAutoReinicio = null;
+            }
+
+            estadoSemaforo = 'cooldown';
+            
+            setTimeout(() => {
+                estadoSemaforo = 'esperando_inicio';
+                logicaSemaforo(null, 'auto', 'Sistema');
+            }, 500); 
+        }
+
+        function logicaSemaforo(fuerza, idOrigen, nombreOrigen) {
+            if (estadoSemaforo === 'cooldown') return;
+
+            const display = document.getElementById('display-principal');
+            const caja = document.getElementById('caja-visual');
+            const btn = document.getElementById('btn-accion');
+            const esModoInfinito = document.getElementById('toggle-semaforo-modo').checked;
+
+            const usarPantallasDivididas = listaFocosConectados.length >= 1;
+            const idLimpio = idOrigen.replace(/[^a-zA-Z0-9]/g, '-');
+
+            // --- REQUISITO 1: REINICIAR MANUALMENTE EN MODO NORMAL ---
+            if (usarPantallasDivididas && !esModoInfinito && estadoSemaforo === 'verde' && idOrigen === 'manual') {
+                limpiarTimers();
+                estadoSemaforo = 'esperando_inicio';
+                logicaSemaforo(null, 'manual', 'Manual');
+                return;
+            }
+
+            if (estadoSemaforo === 'esperando_inicio') {
+                estadoSemaforo = 'rojo';
+                resultadosSemaforoRonda = {}; 
+                
+                listaFocosConectados.forEach(f => f.hasHitThisRound = false);
+
+                display.innerText = "ESPERA...";
+                display.style.fontSize = "30px";
+                caja.className = "display-box semaforo-rojo";
+                btn.innerText = "✋ ESPERA";
+
+                if (usarPantallasDivididas) {
+                    listaFocosConectados.forEach(f => {
+                        const idF = f.id.replace(/[^a-zA-Z0-9]/g, '-');
+                        const fCard = document.getElementById(`semaforo-card-${idF}`);
+                        const fDisplay = document.getElementById(`semaforo-display-${idF}`);
+                        const fStatus = document.getElementById(`semaforo-status-${idF}`);
+                        
+                        if (fCard && fDisplay && fStatus) {
+                            fCard.className = "display-box border-2 border-red-300 bg-red-50 transition-all duration-200 p-4 rounded-xl text-center shadow-sm";
+                            fDisplay.innerText = "🔴";
+                            fDisplay.className = "numero-grande text-3xl font-extrabold my-2 flex items-center justify-center text-red-600";
+                            fStatus.innerText = "ESPERA...";
+                            fStatus.className = "text-[10px] text-red-400 font-semibold uppercase tracking-wider";
+                        }
+                    });
+                }
+
+                const tiempoEspera = Math.floor(Math.random() * 3000) + 2000;
+                timeoutSemaforo = setTimeout(() => {
+                    estadoSemaforo = 'verde';
+                    tiempoInicioVerde = Date.now();
+                    caja.className = "display-box semaforo-verde";
+                    display.innerText = "¡YA!";
+                    display.style.fontSize = "60px";
+                    
+                    // Modificado: Si hay pantallas divididas, el botón dice "OTRA VEZ" para poder reiniciar
+                    btn.innerText = usarPantallasDivididas ? "OTRA VEZ" : "¡GOLPEA!";
+
+                    if (usarPantallasDivididas) {
+                        listaFocosConectados.forEach(f => {
+                            const idF = f.id.replace(/[^a-zA-Z0-9]/g, '-');
+                            const fCard = document.getElementById(`semaforo-card-${idF}`);
+                            const fDisplay = document.getElementById(`semaforo-display-${idF}`);
+                            const fStatus = document.getElementById(`semaforo-status-${idF}`);
+                            
+                            // Si el sensor cometió FALTA, no debe pintarse en verde
+                            const r = resultadosSemaforoRonda[f.id];
+                            if (r && r.falta) {
+                                return; 
+                            }
+
+                            if (fCard && fDisplay && fStatus) {
+                                fCard.className = "display-box border-2 border-emerald-300 bg-emerald-50 transition-all duration-200 p-4 rounded-xl text-center shadow-sm";
+                                fDisplay.innerText = "🟢";
+                                fDisplay.className = "numero-grande text-3xl font-extrabold my-2 flex items-center justify-center text-emerald-600";
+                                fStatus.innerText = "¡YA!";
+                                fStatus.className = "text-[10px] text-emerald-500 font-semibold uppercase tracking-wider";
+                            }
+                        });
+                    }
+                }, tiempoEspera);
+
+            } else if (estadoSemaforo === 'rojo') {
+                if (usarPantallasDivididas) {
+                    const miFoco = listaFocosConectados.find(f => f.id === idOrigen);
+                    if (miFoco) {
+                        if (miFoco.hasHitThisRound) return; 
+                        miFoco.hasHitThisRound = true;
+                    }
+
+                    resultadosSemaforoRonda[idOrigen] = { reaccion: null, falta: true };
+
+                    const fCard = document.getElementById(`semaforo-card-${idLimpio}`);
+                    const fDisplay = document.getElementById(`semaforo-display-${idLimpio}`);
+                    const fStatus = document.getElementById(`semaforo-status-${idLimpio}`);
+                    if (fCard && fDisplay && fStatus) {
+                        fCard.className = "display-box border-2 border-red-500 bg-red-100 transition-all duration-200 p-4 rounded-xl text-center shadow-md";
+                        fDisplay.innerText = "FALTA";
+                        fDisplay.className = "numero-grande text-2xl font-black my-2 flex items-center justify-center text-red-600";
+                        fStatus.innerText = "Salida Falsa";
+                        fStatus.className = "text-[10px] text-red-600 font-bold uppercase tracking-wider";
+                    }
+
+                    reproducirPitidoFalta();
+                    
+                    // --- REQUISITO 2: NO SE REINICIA DE INMEDIATO EN ROJO ---
+                    // Se ha eliminado el bloque de reinicio inmediato para infinito que existía aquí.
+                    // Ahora se queda congelado en falta y el semáforo continúa normalmente hasta verde.
+                } else {
+                    clearTimeout(timeoutSemaforo);
+                    estadoSemaforo = 'cooldown'; 
+                    display.innerText = "¡FALTA!";
+                    display.style.color = "#dc2626";
+                    caja.style.borderColor = "#dc2626";
+                    
+                    reproducirPitidoFalta();
+
+                    if (esModoInfinito) {
+                        setTimeout(() => {
+                            estadoSemaforo = 'esperando_inicio';
+                            resetVisualSemaforo();
+                            logicaSemaforo(null, 'auto', 'Sistema');
+                        }, 1500); 
+                    } else {
+                        setTimeout(() => {
+                            estadoSemaforo = 'esperando_inicio';
+                            resetVisualSemaforo();
+                            display.innerText = "REINTENTAR";
+                        }, 1000);
+                    }
+                }
+
+            } else if (estadoSemaforo === 'verde') {
+                const reaccion = Date.now() - tiempoInicioVerde;
+
+                if (usarPantallasDivididas) {
+                    const miFoco = listaFocosConectados.find(f => f.id === idOrigen);
+                    if (miFoco) {
+                        if (miFoco.hasHitThisRound) return; 
+                        miFoco.hasHitThisRound = true;
+                    }
+
+                    const rPrevia = resultadosSemaforoRonda[idOrigen];
+                    if (rPrevia && rPrevia.falta) {
+                        return; 
+                    }
+
+                    resultadosSemaforoRonda[idOrigen] = { reaccion: reaccion, falta: false };
+
+                    const fCard = document.getElementById(`semaforo-card-${idLimpio}`);
+                    const fDisplay = document.getElementById(`semaforo-display-${idLimpio}`);
+                    const fStatus = document.getElementById(`semaforo-status-${idLimpio}`);
+                    if (fCard && fDisplay && fStatus) {
+                        fCard.className = "display-box border-2 border-emerald-500 bg-white transition-all duration-200 p-4 rounded-xl text-center shadow-md";
+                        fDisplay.innerText = reaccion + "ms";
+                        fDisplay.className = "numero-grande text-2xl font-black my-2 flex items-center justify-center text-emerald-600";
+                        fStatus.innerText = "Completado";
+                        fStatus.className = "text-[10px] text-emerald-500 font-bold uppercase tracking-wider";
+                    }
+
+                    feedbackLuminico(fuerza); 
+
+                    marcarGanadorOroSemaforo();
+
+                    if (esModoInfinito) {
+                        const todosListos = listaFocosConectados.every(f => f.hasHitThisRound);
+                        if (todosListos) {
+                            if (timeoutSemaforoAutoReinicio) {
+                                clearTimeout(timeoutSemaforoAutoReinicio);
+                            }
+                            timeoutSemaforoAutoReinicio = setTimeout(() => {
+                                reiniciarSemaforoInfinitoAutomatico();
+                            }, 1500);
+                        }
+                    }
+                } else {
+                    display.innerText = reaccion + "ms";
+                    display.style.color = "#15803d";
+                    btn.innerText = "OTRA VEZ";
+                    feedbackLuminico(fuerza); 
+                    caja.className = "display-box"; 
+
+                    if (esModoInfinito) {
+                        estadoSemaforo = 'cooldown'; 
+                        setTimeout(() => {
+                            estadoSemaforo = 'esperando_inicio';
+                            logicaSemaforo(null, 'auto', 'Sistema');
+                        }, 1500); 
+                    } else {
+                        estadoSemaforo = 'esperando_inicio';
+                    }
+                }
+            }
+        }
+
+        function resetVisualSemaforo() {
+            const display = document.getElementById('display-principal');
+            const caja = document.getElementById('caja-visual');
+            caja.className = "display-box";
+            display.style.color = "#4f46e5";
+            display.style.fontSize = "60px";
+            display.innerText = "TOCA";
+            document.getElementById('btn-accion').innerText = "INICIAR";
+            if(modoJuego === 'semaforo') document.getElementById('etiqueta-principal').innerText = "Estado";
+        }
+
+        function limpiarTimers() {
+            if (timeoutSemaforo) clearTimeout(timeoutSemaforo);
+            if (timerCompetencia) clearInterval(timerCompetencia);
+            if (timerContraReloj) clearTimeout(timerContraReloj); 
+            if (timeoutSemaforoAutoReinicio) clearTimeout(timeoutSemaforoAutoReinicio);
+        }
+
+        function limpiarLista() {
+            document.getElementById('display-principal').innerText = "--";
+            totalRegistros = 0;
+            ultimaVezClick = null;
+            limpiarTimers();
+            resetVisualSemaforo();
+            reiniciarEstadisticas();
+            
+            resultadosSemaforoRonda = {};
+            if (timeoutSemaforoAutoReinicio) {
+                clearTimeout(timeoutSemaforoAutoReinicio);
+                timeoutSemaforoAutoReinicio = null;
+            }
+
+            listaFocosConectados.forEach(f => f.hasHitThisRound = false);
+
+            if (modoJuego === 'semaforo') {
+                actualizarGridSemaforo();
+            } else if (modoJuego === 'competitivo') {
+                estadoCompetencia = 'esperando';
+                document.getElementById('resultados-competitivo').classList.add('oculto');
+                listaFocosConectados.forEach(f => f.golpes = 0);
+                actualizarGridCompetidores();
+            } else if (modoJuego === 'contra-reloj') {
+                estadoContraReloj = 'esperando';
+                golpesContraReloj = 0;
+                document.getElementById('display-principal').innerText = "0";
+                document.getElementById('etiqueta-principal').innerText = "Golpea para iniciar";
+                
+                const comboTexto = document.getElementById('combo-texto');
+                if (comboTexto) comboTexto.innerText = "Combo x0";
+                
+                const barraCombo = document.getElementById('barra-combo');
+                if (barraCombo) barraCombo.style.width = '0%';
+            }
+        }
+
+        // --- 3. CONEXIÓN BLUETOOTH ROBUSTA ---
+        const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        async function conectarBLE() {
+            try {
+                document.getElementById('btn-conectar').innerText = "Buscando foco...";
+                
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'TKD-' }],
+                    optionalServices: [serviceUuid]
+                });
+
+                if (listaFocosConectados.some(f => f.id === device.id)) {
+                    mostrarNotificacion("Este foco ya se encuentra conectado.");
+                    document.getElementById('btn-conectar').innerText = "➕ Vincular Foco Bluetooth";
+                    return;
+                }
+
+                console.log(`Intentando conectar a: ${device.name} (ID: ${device.id})`);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(serviceUuid);
+                const characteristic = await service.getCharacteristic(characteristicUuid);
+
+                await characteristic.startNotifications();
+                
+                totalFocosConectadosHistorico++;
+                const aliasAsignado = `Foco ${totalFocosConectadosHistorico}`;
+                
+                listaFocosConectados.push({
+                    id: device.id,      
+                    name: aliasAsignado,  
+                    server: server,
+                    golpes: 0 
+                });
+
+                device.addEventListener('gattserverdisconnected', onDesconexion);
+
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = event.target.value;
+                    const decoder = new TextDecoder('utf-8');
+                    const fuerzaReal = parseInt(decoder.decode(value));
+                    
+                    accionJuego(fuerzaReal, device.id, aliasAsignado);
+                });
+                
+                document.getElementById('btn-conectar').innerText = "➕ Vincular Otro Foco";
+                document.getElementById('focos-contador').innerText = `Focos vinculados: ${listaFocosConectados.length}`;
+                
+                if(modoJuego === 'competitivo') actualizarGridCompetidores();
+                if(modoJuego === 'semaforo') actualizarGridSemaforo();
+                
+            } catch(error) {
+                console.error('Error de conexión Multidispositivo BLE: ', error);
+                document.getElementById('btn-conectar').innerText = "❌ Error. Reintentar";
+                setTimeout(() => { document.getElementById('btn-conectar').innerText = "➕ Vincular Foco Bluetooth"; }, 2000);
+            }
+        }
+
+        function onDesconexion(event) {
+            const device = event.target;
+            
+            const miFoco = listaFocosConectados.find(f => f.id === device.id);
+            const nombreFoco = miFoco ? miFoco.name : device.name;
+            console.log(`🔌 Foco desconectado: ${nombreFoco}`);
+            
+            listaFocosConectados = listaFocosConectados.filter(f => f.id !== device.id);
+            
+            document.getElementById('focos-contador').innerText = `Focos vinculados: ${listaFocosConectados.length}`;
+            
+            if (listaFocosConectados.length === 0) {
+                document.getElementById('btn-conectar').innerText = "➕ Vincular Foco Bluetooth";
+                totalFocosConectadosHistorico = 0;
+            }
+            
+            if (modoJuego === 'competitivo') {
+                actualizarGridCompetidores();
+            } else if (modoJuego === 'semaforo') {
+                actualizarGridSemaforo();
+            }
+        }
+    </script>
+</body>
+</html>
