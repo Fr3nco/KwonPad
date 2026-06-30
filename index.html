@@ -112,7 +112,7 @@
         .cuenta-regresiva { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-size: 100px; font-weight: 900; color: #f8fafc; }
         .cuenta-label { font-size: 20px; color: #94a3b8; margin-bottom: 10px; }
 
-        /* --- PANTALLA GANADOR COMPLETA --- */
+       
         .overlay-ganador {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -339,13 +339,13 @@
 </head>
 <body>
 
-    <!-- OVERLAY CUENTA REGRESIVA COMPETITIVO -->
+    
     <div id="cuenta-regresiva" class="cuenta-regresiva oculto">
         <div class="cuenta-label">PREPÁRATE</div>
         <div id="cuenta-numero">3</div>
     </div>
 
-    <!-- PANTALLA GANADOR COMPLETA -->
+  
     <div id="overlay-ganador" class="overlay-ganador oculto" onclick="cerrarOverlayGanador()">
         <div class="ganador-corona" id="ganador-corona">👑</div>
         <div class="ganador-titulo" id="ganador-titulo">Ganador Absoluto</div>
@@ -354,19 +354,19 @@
         <div class="ganador-tap-cerrar">Toca en cualquier lado para volver</div>
     </div>
 
-    <!-- BOTÓN FLOTANTE: ACCESO AL MANUAL DE INSTRUCCIONES -->
+   
     <a href="Manual_de_Uso_-_KwonPad.pdf" target="_blank" rel="noopener" class="btn-manual-flotante" title="Ver manual de instrucciones (PDF)" aria-label="Ver manual de instrucciones en PDF">📖</a>
 
     <div class="card">
         <div id="simulador-led" class="led-strip"></div>
         
         <div class="header" id="header-principal">
-            <h1 id="titulo-header">🎮 Selecciona Nivel</h1>
+            <h1 id="titulo-header">KwonPad</h1>
             <p id="subtitulo-header">Elige tu desafío</p>
         </div>
 
         <div class="content">
-            <!-- PANTALLA MENÚ -->
+          
             <div id="pantalla-menu" class="pantalla">
                 <button id="btn-conectar" onclick="conectarBLE()" style="width: 100%; padding: 15px; margin-bottom: 5px; background-color: #0ea5e9; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
                      ➕ Vincular Foco Bluetooth
@@ -399,7 +399,7 @@
                     <span class="btn-icono">⚡</span>
                 </button>
 
-                <!-- NUEVO: ETIQUETA DE REPORTES DEBAJO DEL MENU PRINCIPAL (PLEGABLE) -->
+              
                 <div class="form-feedback-container">
                     <div class="form-feedback-title" onclick="toggleFeedbackForm()" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
                         <span>✉️ Envianos tu reporte o sugerencia</span>
@@ -411,9 +411,9 @@
                             <label for="categoria">¿De qué se trata tu mensaje?</label>
                             <select name="categoria" id="categoria" required>
                               <option value="" disabled selected>Seleccioná una opción...</option>
-                              <option value="Error">🐛 Reportar un error / Bug</option>
-                              <option value="Sugerencia">💡 Sugerir una funcionalidad</option>
-                              <option value="Saludo">👋 Enviar un saludo / Comentario</option>
+                              <option value="Error"> Reportar un error</option>
+                              <option value="Sugerencia"> Sugerir una funcionalidad</option>
+                              <option value="Saludo"> Enviar un saludo / Comentario</option>
                             </select>
                           </p>
 
@@ -447,7 +447,7 @@
                 <!-- SECCIÓN MODO COMPETITIVO -->
                 <div id="seccion-competitivo" class="oculto">
                     <div id="grid-competidores" class="grid-competidores">
-                        <!-- Se llena dinámicamente con los focos conectados -->
+                        
                     </div>
                     <button id="btn-iniciar-comp" class="btn-iniciar-comp ready" onclick="iniciarCompetencia()">
                         🏁 INICIAR COMPETENCIA
@@ -459,9 +459,9 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN MODOS CLÁSICOS -->
+              
                 <div id="seccion-clasica">
-                    <!-- Selector deslizable exclusivo para el Modo Semáforo -->
+                   
                     <div id="control-modo-semaforo" class="oculto" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; gap: 10px;">
                         <span style="font-size: 13px; font-weight: bold; color: #64748b; text-transform: uppercase;">Normal</span>
                         <label class="switch">
@@ -476,9 +476,9 @@
                         <div id="display-principal" class="numero-grande">--</div>
                     </div>
 
-                    <!-- Grid para Semáforo de Pantallas Divididas por Foco -->
+                
                     <div id="grid-semaforo" class="oculto" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 15px;">
-                        <!-- Se llena dinámicamente con las tarjetas de los focos conectados -->
+                       
                     </div>
 
                     <div id="seccion-combo" class="combo-container">
